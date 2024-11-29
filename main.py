@@ -2,6 +2,30 @@ import streamlit as st
 import pandas as pd
 
 
+def apply_rules(df, description_column, rules):
+    """
+    Apply user-defined rules to categorize transactions.
+    """
+
+    def categorize(description):
+        for rule in rules:
+            condition, value, category = (
+                rule["condition"],
+                rule["value"],
+                rule["category"],
+            )
+            if condition == "Starts With" and description.startswith(value):
+                return category
+            elif condition == "Contains" and value in description:
+                return category
+            elif condition == "Ends With" and description.endswith(value):
+                return category
+        return description  # Default to the description if no rule matches
+
+    df["category"] = df[description_column].apply(categorize)
+    return df
+
+
 def main():
     st.title("Transaction Categoriser & Aggregator")
     st.write(
@@ -70,19 +94,53 @@ def main():
     # Ensure the selected date column is parsed as datetime
     df[date_column] = pd.to_datetime(df[date_column], format=date_format)
 
-    st.write("### Aggregated by Month")
-    # Add a 'month' column in "YYYY-MM" format
-    month_column = "month"
-    df[month_column] = df[date_column].dt.to_period("M").astype(str)
-    # Pivot the table to show unique expenses and monthly sums
-    pivot_table = df.pivot_table(
-        index=description_column,
-        columns=month_column,
-        values=amount_column,
-        aggfunc="sum",
-        fill_value=0,
-    )
-    st.dataframe(pivot_table)
+    # Rule-based categorization
+    st.write("### Specify Rules for Categorization")
+    if "rules" not in st.session_state:
+        st.session_state["rules"] = []
+
+    # Add a new rule
+    with st.form("add_rule_form"):
+        st.write("Add a New Rule")
+        condition = st.selectbox("Condition", ["Starts With", "Contains", "Ends With"])
+        value = st.text_input("Value")
+        category = st.text_input("Category")
+        submitted = st.form_submit_button("Add Rule")
+        if submitted and value and category:
+            st.session_state["rules"].append(
+                {"condition": condition, "value": value, "category": category}
+            )
+            st.success("Rule added!")
+
+    # Display and manage rules
+    st.write("### Current Rules")
+    show_rules = st.checkbox("Show current rules")
+    if show_rules:
+        for i, rule in enumerate(st.session_state["rules"]):
+            st.write(
+                f"{i+1}. If description **{rule['condition']}** '{rule['value']}', categorize as **{rule['category']}**"
+            )
+            if st.button(f"Remove Rule {i+1}"):
+                st.session_state["rules"].pop(i)
+
+    # Apply rules to categorize transactions
+    if st.session_state["rules"]:
+        df = apply_rules(df, description_column, st.session_state["rules"])
+        st.write("### Aggregated by Month and Category")
+        df["month"] = df[date_column].dt.to_period("M").astype(str)
+        summary = (
+            df.groupby(["category", "month"])[amount_column].sum().unstack(fill_value=0)
+        )
+        st.dataframe(summary)
+
+        # Download the results
+        csv = summary.reset_index().to_csv(index=False)
+        st.download_button(
+            "Download Aggregated Results as CSV",
+            csv,
+            "aggregated_results.csv",
+            "text/csv",
+        )
 
 
 if __name__ == "__main__":
