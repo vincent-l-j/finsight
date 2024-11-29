@@ -123,24 +123,25 @@ def main():
             if st.button(f"Remove Rule {i+1}"):
                 st.session_state["rules"].pop(i)
 
+    st.write("### Aggregated by Month and Category")
+    df["month"] = df[date_column].dt.to_period("M").astype(str)
     # Apply rules to categorize transactions
+    df["category"] = df[description_column]
     if st.session_state["rules"]:
         df = apply_rules(df, description_column, st.session_state["rules"])
-        st.write("### Aggregated by Month and Category")
-        df["month"] = df[date_column].dt.to_period("M").astype(str)
-        summary = (
-            df.groupby(["category", "month"])[amount_column].sum().unstack(fill_value=0)
-        )
-        st.dataframe(summary)
+    summary = (
+        df.groupby(["category", "month"])[amount_column].sum().unstack(fill_value=0)
+    )
+    st.dataframe(summary)
 
-        # Download the results
-        csv = summary.reset_index().to_csv(index=False)
-        st.download_button(
-            "Download Aggregated Results as CSV",
-            csv,
-            "aggregated_results.csv",
-            "text/csv",
-        )
+    # Download the results
+    csv = summary.reset_index().to_csv(index=False)
+    st.download_button(
+        "Download Aggregated Results as CSV",
+        csv,
+        "aggregated_results.csv",
+        "text/csv",
+    )
 
 
 if __name__ == "__main__":
