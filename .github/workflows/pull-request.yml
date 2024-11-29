@@ -1,0 +1,21 @@
+name: Pull Request Validation
+
+on:
+  pull_request:
+    types:
+      - opened
+      - synchronize
+      - edited
+
+jobs:
+  validate-pr-title:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v2
+
+      - name: Validate PR Title
+        run: |
+          echo "The title of your pull request is \"${{ github.event.pull_request.title }}\""
+          node .github/scripts/validate-pr-title.js "${{ github.event.pull_request.title }}"
