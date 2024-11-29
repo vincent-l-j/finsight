@@ -46,8 +46,29 @@ def main():
         # Combine debit and credit into a single column
         df[amount_column] = df[credit_column].fillna(0) - df[debit_column].fillna(0)
 
+    st.write("### Specify Date Format")
+    date_formats = {
+        "DD/MM/YYYY": "%d/%m/%Y",
+        "MM/DD/YYYY": "%m/%d/%Y",
+        "DD-MM-YYYY": "%d-%m-%Y",
+        "MM-DD-YYYY": "%m-%d-%Y",
+        "DD/MM/YY": "%d/%m/%y",
+        "MM/DD/YY": "%m/%d/%y",
+        "DD-MM-YY": "%d-%m-%y",
+        "MM-DD-YY": "%m-%d-%y",
+        "YYYYMMDD": "%Y%m%d",
+        "YYYY-MM-DD": "%Y-%m-%d",
+        "YYYY/MM/DD": "%Y/%m/%d",
+    }
+    date_format_readable = st.selectbox(
+        "Select Date Format",
+        options=date_formats.keys(),
+        index=0,
+    )
+    date_format = date_formats[date_format_readable]
+
     # Ensure the selected date column is parsed as datetime
-    df[date_column] = pd.to_datetime(df[date_column], errors="coerce")
+    df[date_column] = pd.to_datetime(df[date_column], format=date_format)
 
     # Preview the processed data
     st.write("### Processed Data")
