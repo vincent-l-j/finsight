@@ -70,11 +70,19 @@ def main():
     # Ensure the selected date column is parsed as datetime
     df[date_column] = pd.to_datetime(df[date_column], format=date_format)
 
-    # Preview the processed data
-    st.write("### Processed Data")
-    st.dataframe(df[[date_column, description_column, amount_column]])
-
-    st.write("The data is now ready for further processing!")
+    st.write("### Aggregated by Month")
+    # Add a 'month' column in "YYYY-MM" format
+    month_column = "month"
+    df[month_column] = df[date_column].dt.to_period("M").astype(str)
+    # Pivot the table to show unique expenses and monthly sums
+    pivot_table = df.pivot_table(
+        index=description_column,
+        columns=month_column,
+        values=amount_column,
+        aggfunc="sum",
+        fill_value=0,
+    )
+    st.dataframe(pivot_table)
 
 
 if __name__ == "__main__":
