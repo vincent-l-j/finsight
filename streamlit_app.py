@@ -63,10 +63,14 @@ def main():
 
     amount_column = "amount"
     if amount_option == "Single Column":
-        amount_column = st.selectbox("Select the Amount Column", column_names)
+        amount_column = st.selectbox(
+            "Select the Amount Column",
+            column_names,
+            index=2,
+        )
     else:
-        debit_column = st.selectbox("Select the Debit Column", column_names)
-        credit_column = st.selectbox("Select the Credit Column", column_names)
+        debit_column = st.selectbox("Select the Debit Column", column_names, index=2)
+        credit_column = st.selectbox("Select the Credit Column", column_names, index=3)
         # Combine debit and credit into a single column
         df[amount_column] = df[credit_column].fillna(0) - df[debit_column].fillna(0)
 
