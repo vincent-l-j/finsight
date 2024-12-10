@@ -1,29 +1,58 @@
 import streamlit as st
 import pandas as pd
+from collections import Counter
 
 
-def apply_rules(df, description_column, rules):
+def consolidate_words(word_list):
     """
-    Apply user-defined rules to categorize transactions.
+    Consolidate words with different casing.
+    Keeps the word that occurs the most, with a tie-breaking preference for more capital letters.
     """
+    # Group words by their lowercase version
+    word_groups = {}
+    for word in word_list:
+        normalized = word.lower()
+        if normalized not in word_groups:
+            word_groups[normalized] = []
+        word_groups[normalized].append(word)
 
-    def categorize(description):
-        for rule in rules:
-            condition, value, category = (
-                rule["condition"],
-                rule["value"],
-                rule["category"],
-            )
-            if condition == "Starts With" and description.startswith(value):
-                return category
-            elif condition == "Contains" and value in description:
-                return category
-            elif condition == "Ends With" and description.endswith(value):
-                return category
-        return description  # Default to the description if no rule matches
+    # Determine the best word for each group
+    consolidated_words = {}
+    for normalized, words in word_groups.items():
+        # Count occurrences of each original word
+        word_counts = Counter(words)
+        # Sort by frequency and then by number of uppercase letters
+        best_word = max(
+            word_counts,
+            key=lambda w: (word_counts[w], sum(1 for c in w if c.isupper())),
+        )
+        consolidated_words[best_word.lower()] = best_word
 
-    df["category"] = df[description_column].apply(categorize)
-    return df
+    return consolidated_words
+
+
+def normalise_phrases(phrases: list) -> str:
+    lowered = [x.lower().split() for x in phrases]
+    # find all common words
+    common_words = set(lowered[0]).intersection(*lowered[1:])
+    # remove non-common words
+    common_phrases = [
+        [word for word in lst if word.lower() in common_words]
+        for lst in [x.split() for x in phrases]
+    ]
+    # calculate most common spelling casing of each word
+    best_spelling = consolidate_words([y for x in common_phrases for y in x])
+    # replace with best spelling
+    best_phrases = [
+        [best_spelling[word.lower()] for word in lst] for lst in common_phrases
+    ]
+    # use shortest phrase
+    lengths = [len(x) for x in common_phrases]
+    # find first min
+    idx = lengths.index(min(lengths))
+    # create best phrase
+    best_phrase = " ".join(best_phrases[idx])
+    return best_phrase
 
 
 def main():
@@ -98,41 +127,19 @@ def main():
     # Ensure the selected date column is parsed as datetime
     df[date_column] = pd.to_datetime(df[date_column], format=date_format)
 
-    # Rule-based categorization
-    st.write("### Specify Rules for Categorization")
-    if "rules" not in st.session_state:
-        st.session_state["rules"] = []
-
-    # Add a new rule
-    with st.form("add_rule_form"):
-        st.write("Add a New Rule")
-        condition = st.selectbox("Condition", ["Starts With", "Contains", "Ends With"])
-        value = st.text_input("Value")
-        category = st.text_input("Category")
-        submitted = st.form_submit_button("Add Rule")
-        if submitted and value and category:
-            st.session_state["rules"].append(
-                {"condition": condition, "value": value, "category": category}
-            )
-            st.success("Rule added!")
-
-    # Display and manage rules
-    st.write("### Current Rules")
-    show_rules = st.checkbox("Show current rules")
-    if show_rules:
-        for i, rule in enumerate(st.session_state["rules"]):
-            st.write(
-                f"{i+1}. If description **{rule['condition']}** '{rule['value']}', categorize as **{rule['category']}**"
-            )
-            if st.button(f"Remove Rule {i+1}"):
-                st.session_state["rules"].pop(i)
-
     st.write("### Aggregated by Month and Category")
     df["month"] = df[date_column].dt.to_period("M").astype(str)
     # Apply rules to categorize transactions
-    df["category"] = df[description_column]
-    if st.session_state["rules"]:
-        df = apply_rules(df, description_column, st.session_state["rules"])
+    df["category"] = df[description_column].apply(
+        lambda x: " ".join(x.replace("*", " ").replace("/", " ").split())
+    )
+    # if they start with the same first two words, group them together
+    df["normalised"] = df["category"].str.lower().str.split()
+    df["first"] = df["normalised"].apply(lambda x: " ".join(x[:2]))
+    # normalise the phrases
+    dict_phrases = df.groupby("first")["category"].agg(normalise_phrases).to_dict()
+    # update the category
+    df["category"] = df["first"].map(dict_phrases)
     summary = (
         df.groupby(["category", "month"])[amount_column].sum().unstack(fill_value=0)
     )
