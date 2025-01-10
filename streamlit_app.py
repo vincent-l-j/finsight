@@ -151,6 +151,11 @@ def main():
         index=0,
     )
     date_format = date_formats[date_format_readable]
+    st.write("### Description Grouping")
+    group_words_option = st.radio(
+        "Group descriptions by the first how many words?",
+        options=[1, 2, 3],
+    )
 
     # Ensure the selected date column is parsed as datetime
     df[date_column] = pd.to_datetime(df[date_column], format=date_format)
@@ -162,7 +167,7 @@ def main():
     df["category"] = df[description_column].apply(clean_description)
     # if they start with the same first two words, group them together
     df["normalised"] = df["category"].str.lower().str.split()
-    df["first"] = df["normalised"].apply(lambda x: " ".join(x[:2]))
+    df["first"] = df["normalised"].apply(lambda x: " ".join(x[:group_words_option]))
     # normalise the phrases
     dict_phrases = df.groupby("first")["category"].agg(normalise_phrases).to_dict()
     # update the category
