@@ -122,7 +122,13 @@ def main():
         debit_column = st.selectbox("Select the Debit Column", column_names, index=2)
         credit_column = st.selectbox("Select the Credit Column", column_names, index=3)
         # Combine debit and credit into a single column
-        df[amount_column] = df[credit_column].fillna(0) - df[debit_column].fillna(0)
+        df[amount_column] = df[credit_column].astype(str).str.replace(",", "").astype(
+            float
+        ).fillna(0) - df[debit_column].astype(str).str.replace(",", "").astype(
+            float
+        ).fillna(
+            0
+        )
 
     st.write("### Specify Date Format")
     date_formats = {
@@ -137,6 +143,7 @@ def main():
         "YYYYMMDD": "%Y%m%d",
         "YYYY-MM-DD": "%Y-%m-%d",
         "YYYY/MM/DD": "%Y/%m/%d",
+        "DD MMM YYYY": "%d %b %Y",
     }
     date_format_readable = st.selectbox(
         "Select Date Format",
