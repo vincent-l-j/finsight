@@ -3,6 +3,8 @@ import pandas as pd
 from collections import Counter
 
 payment_prefixes = [
+    "VISA DEBIT PURCHASE CARD 2543",
+    "VISA DEBIT DEPOSIT CARD 2543",
     "EFTPOS",
     "EZI",
     "IPY",
@@ -18,10 +20,17 @@ payment_prefixes = [
 
 
 def clean_description(text: str) -> str:
-    words = text.replace("*", " ").replace("/", " ").split()
-    while words[0] in payment_prefixes:
-        words = words[1:]
-    return " ".join(words)
+    cleaned = text.replace("*", " ").replace("/", " ")
+    is_prefix = True
+    while is_prefix:
+        is_prefix = False
+        for x in payment_prefixes:
+            if cleaned.startswith(x):
+                cleaned = cleaned.replace(x, "").lstrip()
+                is_prefix = True
+                break
+
+    return cleaned
 
 
 def consolidate_words(word_list):
