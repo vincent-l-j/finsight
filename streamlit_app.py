@@ -2,6 +2,27 @@ import streamlit as st
 import pandas as pd
 from collections import Counter
 
+payment_prefixes = [
+    "EFTPOS",
+    "EZI",
+    "IPY",
+    "LS",
+    "LSP",
+    "PAYPAL",
+    "SMP",
+    "SP",
+    "SQ",
+    "SSP",
+    "ZLR",
+]
+
+
+def clean_description(text: str) -> str:
+    words = text.replace("*", " ").replace("/", " ").split()
+    while words[0] in payment_prefixes:
+        words = words[1:]
+    return " ".join(words)
+
 
 def consolidate_words(word_list):
     """
@@ -130,9 +151,8 @@ def main():
     st.write("### Aggregated by Month and Category")
     df["month"] = df[date_column].dt.to_period("M").astype(str)
     # Apply rules to categorize transactions
-    df["category"] = df[description_column].apply(
-        lambda x: " ".join(x.replace("*", " ").replace("/", " ").split())
-    )
+    # remove payment prefixes
+    df["category"] = df[description_column].apply(clean_description)
     # if they start with the same first two words, group them together
     df["normalised"] = df["category"].str.lower().str.split()
     df["first"] = df["normalised"].apply(lambda x: " ".join(x[:2]))
