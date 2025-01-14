@@ -162,6 +162,10 @@ def main():
 
     st.write("### Aggregated by Month and Category")
     df["month"] = df[date_column].dt.to_period("M").astype(str)
+    df["month"] = df.apply(
+        lambda x: (x["month"] + (" Debit" if x[amount_column] < 0 else " Credit")),
+        axis=1,
+    )
     # Apply rules to categorize transactions
     # remove payment prefixes
     df["category"] = df[description_column].apply(clean_description)
