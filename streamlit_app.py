@@ -20,7 +20,7 @@ payment_prefixes = [
 
 
 def clean_description(text: str) -> str:
-    cleaned = text.replace("*", " ").replace("/", " ")
+    cleaned = str(text).replace("*", " ").replace("/", " ")
     is_prefix = True
     while is_prefix:
         is_prefix = False
@@ -98,39 +98,43 @@ def main():
 
     # Read the CSV into a DataFrame
     df = pd.read_csv(uploaded_file)
-    st.write("### Preview of Uploaded Data")
-    st.write(df)
+    is_preview = st.checkbox("Preview Uploaded Data")
+    if is_preview:
+        st.write("### Preview of Uploaded Data")
+        st.write(df)
 
-    # Dynamically specify the column names
-    st.write("### Specify Column Mapping")
+    # infer the column mapping
     column_names = df.columns.tolist()
-
-    date_column = st.selectbox(
-        "Select the Date Column",
-        column_names,
-        index=0,
-    )
-    description_column = st.selectbox(
-        "Select the Description Column",
-        column_names,
-        index=1,
-    )
-    amount_option = st.radio(
-        "How is the Amount Represented?",
-        options=["Single Column", "Split into Debit/Credit"],
-    )
-
-    amount_column = "amount"
-    if amount_option == "Single Column":
-        amount_column = st.selectbox(
-            "Select the Amount Column",
-            column_names,
-            index=2,
-        )
-    else:
-        debit_column = st.selectbox("Select the Debit Column", column_names, index=2)
-        credit_column = st.selectbox("Select the Credit Column", column_names, index=3)
-        # Combine debit and credit into a single column
+    group_words_option = 2
+    date_column = "Date"
+    date_index = 0
+    description_column = "Description"
+    description_index = 1
+    debit_column = ""
+    debit_index = 2
+    credit_column = ""
+    credit_index = 3
+    amount_column = "Amount"
+    amount_index = 2
+    date_format = ""
+    for i, c in enumerate(column_names):
+        if c.lower() == "date":
+            date_column = c
+            date_index = i
+        elif c.lower() == "description":
+            description_column = c
+            description_index = i
+        elif "debit" in c.lower():
+            debit_column = c
+            debit_index = i
+        elif "credit" in c.lower():
+            credit_column = c
+            credit_index = i
+        elif "amount" in c.lower():
+            amount_column = c
+            amount_index = i
+    if debit_column and credit_column:
+        amount_column = "Amount"
         df[amount_column] = df[credit_column].astype(str).str.replace(",", "").astype(
             float
         ).fillna(0) - df[debit_column].astype(str).str.replace(",", "").astype(
@@ -139,32 +143,99 @@ def main():
             0
         )
 
-    st.write("### Specify Date Format")
-    date_formats = {
-        "DD/MM/YYYY": "%d/%m/%Y",
-        "MM/DD/YYYY": "%m/%d/%Y",
-        "DD-MM-YYYY": "%d-%m-%Y",
-        "MM-DD-YYYY": "%m-%d-%Y",
-        "DD/MM/YY": "%d/%m/%y",
-        "MM/DD/YY": "%m/%d/%y",
-        "DD-MM-YY": "%d-%m-%y",
-        "MM-DD-YY": "%m-%d-%y",
-        "YYYYMMDD": "%Y%m%d",
-        "YYYY-MM-DD": "%Y-%m-%d",
-        "YYYY/MM/DD": "%Y/%m/%d",
-        "DD MMM YYYY": "%d %b %Y",
-    }
-    date_format_readable = st.selectbox(
-        "Select Date Format",
-        options=date_formats.keys(),
-        index=0,
-    )
-    date_format = date_formats[date_format_readable]
-    st.write("### Description Grouping")
-    group_words_option = st.radio(
-        "Group descriptions by the first how many words?",
-        options=[1, 2, 3],
-    )
+    sample_date = df[date_column].iloc[0]
+    if len(sample_date) == 10:
+        sep_char = sample_date[4]
+        if sep_char in ["/", "-", " "]:
+            date_format = f"%Y{sep_char}%m{sep_char}%d"
+        elif sample_date[2] in ["/", "-", " "]:
+            # could also be month day year but ignore the American way
+            sep_char = sample_date[2]
+            date_format = f"%d{sep_char}%m{sep_char}%Y"
+    elif len(sample_date) == 8:
+        sep_char = sample_date[2]
+        if sep_char in ["/", "-"]:
+            date_format = f"%d{sep_char}%m{sep_char}%y"
+        else:
+            date_format = "%Y%m%d"
+    elif len(sample_date) == 11:
+        date_format = "%d %b %Y"
+
+    if not date_format:
+        raise ValueError(f"Unrecognised date format: {sample_date}")
+
+    is_edit_mapping = st.checkbox("Edit column mapping and settings")
+    if is_edit_mapping:
+        # Dynamically specify the column names
+        st.write("### Specify Column Mapping")
+
+        date_column = st.selectbox(
+            "Select the Date Column",
+            column_names,
+            index=date_index,
+        )
+        description_column = st.selectbox(
+            "Select the Description Column",
+            column_names,
+            index=description_index,
+        )
+        amount_option = st.radio(
+            "How is the Amount Represented?",
+            options=["Single Column", "Split into Debit/Credit"],
+            index=1 if debit_column and credit_column else 0,
+        )
+
+        amount_column = "amount"
+        if amount_option == "Single Column":
+            amount_column = st.selectbox(
+                "Select the Amount Column",
+                column_names,
+                index=amount_index,
+            )
+        else:
+            debit_column = st.selectbox(
+                "Select the Debit Column", column_names, index=debit_index
+            )
+            credit_column = st.selectbox(
+                "Select the Credit Column", column_names, index=credit_index
+            )
+            # Combine debit and credit into a single column
+            df[amount_column] = df[credit_column].astype(str).str.replace(
+                ",", ""
+            ).astype(float).fillna(0) - df[debit_column].astype(str).str.replace(
+                ",", ""
+            ).astype(
+                float
+            ).fillna(
+                0
+            )
+
+        st.write("### Specify Date Format")
+        date_formats = {
+            "DD/MM/YYYY": "%d/%m/%Y",
+            "MM/DD/YYYY": "%m/%d/%Y",
+            "DD-MM-YYYY": "%d-%m-%Y",
+            "MM-DD-YYYY": "%m-%d-%Y",
+            "DD/MM/YY": "%d/%m/%y",
+            "MM/DD/YY": "%m/%d/%y",
+            "DD-MM-YY": "%d-%m-%y",
+            "MM-DD-YY": "%m-%d-%y",
+            "YYYYMMDD": "%Y%m%d",
+            "YYYY-MM-DD": "%Y-%m-%d",
+            "YYYY/MM/DD": "%Y/%m/%d",
+            "DD MMM YYYY": "%d %b %Y",
+        }
+        date_format_readable = st.selectbox(
+            "Select Date Format",
+            options=date_formats.keys(),
+            index=list(date_formats.values()).index(date_format),
+        )
+        date_format = date_formats[date_format_readable]
+        st.write("### Description Grouping")
+        group_words_option = st.radio(
+            "Group descriptions by the first how many words?",
+            options=[1, 2, 3],
+        )
 
     # Ensure the selected date column is parsed as datetime
     df[date_column] = pd.to_datetime(df[date_column], format=date_format)
