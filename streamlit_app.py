@@ -1,3 +1,4 @@
+import re
 import streamlit as st
 import pandas as pd
 from collections import Counter
@@ -20,7 +21,7 @@ payment_prefixes = [
 
 
 def clean_description(text: str) -> str:
-    cleaned = str(text).replace("*", " ").replace("/", " ")
+    cleaned = re.sub(r"(?<!\d)/", " ", str(text).replace("*", " "))
     is_prefix = True
     while is_prefix:
         is_prefix = False
