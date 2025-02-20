@@ -135,7 +135,6 @@ def main():
             amount_column = c
             amount_index = i
     if debit_column and credit_column:
-        amount_column = "Amount"
         df[amount_column] = df[credit_column].astype(str).str.replace(",", "").astype(
             float
         ).fillna(0) - df[debit_column].astype(str).str.replace(",", "").astype(
@@ -186,7 +185,6 @@ def main():
             index=1 if debit_column and credit_column else 0,
         )
 
-        amount_column = "amount"
         if amount_option == "Single Column":
             amount_column = st.selectbox(
                 "Select the Amount Column",
