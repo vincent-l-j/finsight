@@ -143,27 +143,6 @@ def main():
             0
         )
 
-    sample_date = df[date_column].iloc[0]
-    if len(sample_date) == 10:
-        sep_char = sample_date[4]
-        if sep_char in ["/", "-", " "]:
-            date_format = f"%Y{sep_char}%m{sep_char}%d"
-        elif sample_date[2] in ["/", "-", " "]:
-            # could also be month day year but ignore the American way
-            sep_char = sample_date[2]
-            date_format = f"%d{sep_char}%m{sep_char}%Y"
-    elif len(sample_date) == 8:
-        sep_char = sample_date[2]
-        if sep_char in ["/", "-"]:
-            date_format = f"%d{sep_char}%m{sep_char}%y"
-        else:
-            date_format = "%Y%m%d"
-    elif len(sample_date) == 11:
-        date_format = "%d %b %Y"
-
-    if not date_format:
-        raise ValueError(f"Unrecognised date format: {sample_date}")
-
     is_edit_mapping = st.checkbox("Edit column mapping and settings")
     if is_edit_mapping:
         # Dynamically specify the column names
@@ -209,32 +188,43 @@ def main():
                 0
             )
 
-        st.write("### Specify Date Format")
-        date_formats = {
-            "DD/MM/YYYY": "%d/%m/%Y",
-            "MM/DD/YYYY": "%m/%d/%Y",
-            "DD-MM-YYYY": "%d-%m-%Y",
-            "MM-DD-YYYY": "%m-%d-%Y",
-            "DD/MM/YY": "%d/%m/%y",
-            "MM/DD/YY": "%m/%d/%y",
-            "DD-MM-YY": "%d-%m-%y",
-            "MM-DD-YY": "%m-%d-%y",
-            "YYYYMMDD": "%Y%m%d",
-            "YYYY-MM-DD": "%Y-%m-%d",
-            "YYYY/MM/DD": "%Y/%m/%d",
-            "DD MMM YYYY": "%d %b %Y",
-        }
-        date_format_readable = st.selectbox(
-            "Select Date Format",
-            options=date_formats.keys(),
-            index=list(date_formats.values()).index(date_format),
-        )
-        date_format = date_formats[date_format_readable]
         st.write("### Description Grouping")
         group_words_option = st.radio(
             "Group descriptions by the first how many words?",
             options=[1, 2, 3],
         )
+
+    # Standardise date column format
+    # Function to split using any non-digit separator
+    def split_date(date_str):
+        return list(map(int, re.split(r"\D+", date_str)))
+
+    # Apply splitting to all rows of date column
+    split_cols = pd.DataFrame(
+        df[date_column].apply(split_date).to_list(), columns=["part0", "part1", "part2"]
+    )
+
+    # Step 2: Determine which column is the year
+    year_col = None
+    for col in split_cols.columns:
+        if (split_cols[col] > 31).all():  # all values > 31 = likely year
+            year_col = col
+            break
+    if year_col is None:
+        raise ValueError("Could not confidently identify the year column")
+
+    # Step 3: Determine which columns are the day/month
+    remaining = [c for c in split_cols.columns if c != year_col]
+    (day_col, month_col) = (
+        (remaining[0], remaining[1])
+        if split_cols[remaining[0]].max() > 12
+        else (remaining[1], remaining[0])
+    )
+
+    df[date_column] = (
+        split_cols[[year_col, month_col, day_col]].astype(str).agg("-".join, axis=1)
+    )
+    date_format = "%Y-%m-%d"
 
     # Ensure the selected date column is parsed as datetime
     df[date_column] = pd.to_datetime(df[date_column], format=date_format)
